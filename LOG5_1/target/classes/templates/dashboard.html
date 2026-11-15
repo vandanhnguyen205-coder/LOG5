@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Hệ Thống Logistics Hàng Đặc Biệt LOG-05</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-white min-h-screen p-6">
+    <div class="max-w-7xl mx-auto space-y-6">
+
+        <!-- HEADER -->
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-lg">
+            <div>
+                <h1 class="text-2xl font-bold text-sky-400"> QUẢN LÝ HÀNG ĐẶC BIỆT LOG-05</h1>
+                <p class="text-xs text-slate-400 mt-1">
+                    Đang đăng nhập: <span class="font-bold text-white" th:text="${currentUser.hoTen}"></span>
+                    (<span th:text="${currentUser.email}"></span>)
+                </p>
+            </div>
+            <div class="flex flex-wrap items-center gap-3 mt-3 md:mt-0">
+                <span class="px-3 py-1.5 rounded text-xs font-bold text-white shadow" th:style="|background-color: ${currentUser.bg}|" th:text="${currentUser.label}"></span>
+                <a th:if="${currentUser.vaiTro == 'TAI_XE_VAN_CHUYEN' or currentUser.vaiTro == 'DIEU_PHOI_VIEN' or currentUser.vaiTro == 'QUAN_TRI_HE_THONG'}" href="/orders/complete-delivery" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-2 rounded transition">Trang Bàn Giao POD</a>
+                <a th:if="${currentUser.vaiTro == 'QUAN_TRI_HE_THONG'}" href="/admin/users" class="bg-red-600 hover:bg-red-500 text-white text-xs font-bold px-3 py-2 rounded transition">Quản Lý Users</a>
+                <a href="/logout" class="bg-slate-700 hover:bg-slate-600 text-white text-xs px-3 py-2 rounded transition">Đăng Xuất</a>
+            </div>
+        </div>
+
+        <!-- CẢNH BÁO TRẠM KIỂM TRA (NẾU CHƯA ĐO NHIỆT ĐỘ TRÊN FLUTTER) -->
+        <div th:if="${checkpointWarning != null}" class="bg-amber-950/90 border border-amber-500 p-4 rounded-xl text-xs text-amber-200 flex justify-between items-center shadow-xl">
+            <div class="font-bold" th:text="${checkpointWarning}"></div>
+            <button onclick="this.parentElement.style.display='none'" class="text-amber-400 hover:text-white font-bold px-2">✕</button>
+        </div>
+
+        <!-- BANNER THÔNG BÁO REALTIME TỪ FLUTTER TÀI XẾ -->
+        <div id="liveAlertContainer" class="hidden bg-emerald-900/90 border border-emerald-500 p-4 rounded-xl text-xs text-emerald-200 flex justify-between items-center shadow-xl transition-all animate-fade-in">
+            <div class="flex items-center gap-3">
+                <span class="text-2xl animate-bounce"></span>
+                <div>
+                    <div class="font-bold text-white text-sm" id="alertTitle">Cập Nhật Từ Tài Xế Mobile Flutter</div>
+                    <div id="alertMessage" class="text-emerald-200 mt-0.5">Đơn hàng vừa được cập nhật nhiệt độ an toàn!</div>
+                </div>
+            </div>
+            <button onclick="document.getElementById('liveAlertContainer').classList.add('hidden')" class="text-emerald-400 hover:text-white font-bold px-2 py-1 text-base">✕</button>
+        </div>
+
+        <!-- FORM TẠO ĐƠN HÀNG MỚI (CHỦ HÀNG/ADMIN) -->
+        <div th:if="${currentUser.vaiTro == 'NGUOI_GUI_HANG' or currentUser.vaiTro == 'QUAN_TRI_HE_THONG'}" class="bg-slate-800 p-6 rounded-xl border border-slate-700">
+            <h2 class="text-lg font-bold text-sky-400 mb-4">Tạo Yêu Cầu Vận Chuyển Hàng Đặc Biệt Mới (Chủ Hàng)</h2>
+            <form action="/orders/create" method="post" enctype="multipart/form-data" class="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
+                <div>
+                    <label class="block text-slate-300 mb-1">Tên Hàng Hóa</label>
+                    <input type="text" name="tenHang" required placeholder="Nhập tên hàng hóa vận chuyển..." class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
+                </div>
+                <div>
+                    <label class="block text-slate-300 mb-1">Loại Hàng Hóa</label>
+                    <input type="text" name="loaiHang" required placeholder="Dược Phẩm / Thủy Hải Sản" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
+                </div>
+                <div>
+                    <label class="block text-slate-300 mb-1">Nhiệt Độ Thấp Nhất (°C)</label>
+                    <input type="number" step="0.1" name="minTemp" value="-25" required class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
+                </div>
+                <div>
+                    <label class="block text-slate-300 mb-1">Nhiệt Độ Cao Nhất (°C)</label>
+                    <input type="number" step="0.1" name="maxTemp" value="-15" required class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
+                </div>
+                <div>
+                    <label class="block text-slate-300 mb-1">Điểm Đi (Kho Xuất)</label>
+                    <input type="text" name="diemDi" required placeholder="Kho Cát Lái, TP.HCM" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
+                </div>
+                <div>
+                    <label class="block text-slate-300 mb-1">Điểm Đến (Kho Nhận)</label>
+                    <input type="text" name="diemDen" required placeholder="Kho Lạnh Cần Thơ" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
+                </div>
+                <div>
+                    <label class="block text-slate-300 mb-1">Loại Chứng Từ Đính Kèm</label>
+                    <select name="loaiGiayTo" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white focus:outline-none">
+                        <option value="Giấy Phép Vận Chuyển Hàng Đặc Biệt Y Tế">Giấy Phép Vận Chuyển Hàng Đặc Biệt Y Tế</option>
+                        <option value="Giấy Chứng Nhận HACCP / CO-CQ">Giấy Chứng Nhận HACCP / CO-CQ</option>
+                        <option value="Phiếu Kiểm Định Chất Lượng Seafood">Phiếu Kiểm Định Chất Lượng Seafood</option>
+                        <option value="Giấy Phép Vệ Sinh An Toàn Thực Phẩm">Giấy Phép Vệ Sinh An Toàn Thực Phẩm</option>
+                        <option value="Chứng Từ Lạnh Khác">Chứng Từ Lạnh Khác</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-slate-300 mb-1">Chọn File Chứng Từ (PDF / Docx / Ảnh)</label>
+                    <input type="file" name="fileUpload" class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-slate-300 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-sky-600 file:text-white hover:file:bg-sky-500 cursor-pointer">
+                </div>
+                <div class="md:col-span-4 flex justify-end">
+                    <button type="submit" class="bg-sky-600 hover:bg-sky-500 text-white font-bold px-6 py-2 rounded text-sm transition">Gửi Yêu Cầu Phê Duyệt</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- DANH SÁCH ĐƠN HÀNG VÀ CÁC THAO TÁC THEO VAI TRÒ -->
+        <div class="bg-slate-800 rounded-xl p-6 border border-slate-700">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-bold text-slate-200"> Danh Sách Đơn Hàng Nghiệp Vụ</h2>
+                <div class="flex items-center gap-2 text-xs text-slate-400">
+                    <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span>Đồng bộ Realtime với Flutter App (Mỗi 3s)</span>
+                </div>
+            </div>
+
+            <div th:if="${#lists.isEmpty(orders)}" class="bg-slate-900/80 border border-slate-700 rounded-xl p-8 text-center text-sm text-slate-400">
+                Hiện tại chưa có đơn hàng nào được phân công cho tài khoản của bạn.
+            </div>
+
+            <div class="space-y-6">
+                <div th:each="item : ${orders}" class="bg-slate-900 p-5 rounded-xl border border-slate-700 shadow-md">
+
+                    <!-- HEADER ĐƠN HÀNG -->
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 mb-3 pb-3 border-b border-slate-800">
+                        <div>
+                            <span class="text-sky-400 font-mono font-bold text-base" th:text="${item.id}"></span>
+                            <span class="text-white font-bold ml-2 text-lg" th:text="${item.tenHang}"></span>
+                            <span class="text-xs bg-slate-800 text-slate-400 px-2.5 py-1 rounded ml-2" th:text="${item.loaiHang}"></span>
+                        </div>
+                        <span class="px-3 py-1 rounded text-xs font-bold"
+                              th:classappend="${item.trangThai == 'BI_CHAN'} ? 'bg-red-600 text-white' : (${item.trangThai == 'Đã giao hàng'} ? 'bg-emerald-600 text-white' : (${item.trangThai == 'Từ chối'} ? 'bg-rose-700 text-white' : 'bg-amber-600 text-white'))"
+                              th:text="${item.trangThai}"></span>
+                    </div>
+
+                    <!-- THÔNG TIN CHI TIẾT -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-slate-300 mb-4">
+                        <div> Lộ trình: <span class="font-bold text-white" th:text="${item.diemDi}"></span> ➔ <span class="font-bold text-white" th:text="${item.diemDen}"></span></div>
+                        <div>Nhiệt độ thực tế (Từ Flutter): <span class="font-bold text-emerald-400" th:text="${item.nhietDoThucTe}"></span>°C (Ngưỡng: <span th:text="${item.minTemp}"></span>°C đến <span th:text="${item.maxTemp}"></span>°C)</div>
+                        <div> Tài xế phụ trách: <span class="font-bold text-white" th:text="${item.taiXeTen}"></span> (Biển số: <span th:text="${item.bienSoXe}"></span>)</div>
+                        <div>Tiến độ trạm kiểm tra: <span class="font-bold" th:classappend="${item.duBaTram} ? 'text-emerald-400' : 'text-amber-400'" th:text="|${item.soTramDaQua}/3 trạm đã qua|"></span></div>
+                    </div>
+
+                    <!-- LÝ DO CHẶN NGOẠI LỆ / TỪ CHỐI -->
+                    <div th:if="${item.trangThai == 'BI_CHAN'}" class="bg-red-950/60 border border-red-800 p-3 rounded text-xs text-red-300 mb-4">
+                         LÝ DO BỊ CHẶN NGOẠI LỆ (EXCEPTION): <span class="font-bold" th:text="${item.lyDoBiChan}"></span>
+                    </div>
+                    <div th:if="${item.trangThai == 'Từ chối'}" class="bg-rose-950/60 border border-rose-800 p-3 rounded text-xs text-rose-300 mb-4">
+                         LÝ DO TỪ CHỐI ĐƠN: <span class="font-bold" th:text="${item.lyDoTuChoi}"></span>
+                        <div class="text-[11px] text-rose-200/80 mt-1"> Chủ hàng phải <b>bổ sung / sửa trực tiếp trên giấy tờ bị từ chối</b> hoặc <b>xóa đi gửi lại</b> trước khi Kiểm duyệt viên có thể duyệt tiếp.</div>
+                    </div>
+
+                    <!-- DANH SÁCH CHỨNG TỪ ĐÍNH KÈM VÀ XEM CHI TIẾT -->
+                    <div class="bg-slate-950/50 p-4 rounded-lg mb-4 border border-slate-800">
+                        <div class="flex justify-between items-center mb-3">
+                            <span class="text-xs font-bold text-sky-400"> Giấy Tờ & Chứng Từ Lạnh Cần Kiểm Duyệt:</span>
+                            <span class="text-[10px] text-slate-500">Bấm " Xem Giấy Tờ Đã Khai" để mở xem chi tiết & tải tệp</span>
+                        </div>
+
+                        <div th:if="${#lists.isEmpty(item.danhSachGiayTo)}" class="text-xs text-amber-300 bg-slate-900 p-3 rounded border border-slate-800">
+                             Chứng từ bị từ chối đã được xóa. Chủ hàng vui lòng tải lên giấy tờ mới bên dưới để gửi lại kiểm duyệt.
+                        </div>
+
+                        <div class="space-y-3">
+                            <div th:each="doc : ${item.danhSachGiayTo}" class="bg-slate-900 p-3 rounded border border-slate-800 space-y-2.5">
+                                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                                    <div>
+                                        <div class="font-bold text-xs text-slate-200" th:text="${doc.loaiGiayTo}"></div>
+                                        <div class="text-[11px] text-slate-400 font-mono flex items-center gap-1 mt-0.5">
+                                             File đính kèm: <span class="text-sky-300 underline font-semibold" th:text="${doc.tenFile}"></span>
+                                        </div>
+                                    </div>
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <span th:if="${doc.approved}" class="text-emerald-400 font-bold text-xs bg-emerald-950/60 px-2.5 py-1 rounded border border-emerald-800"> Đã Phê Duyệt</span>
+                                        <span th:if="${doc.rejected}" class="text-rose-400 font-bold text-xs bg-rose-950/60 px-2.5 py-1 rounded border border-rose-800"> Bị Từ Chối</span>
+                                        <span th:if="${not doc.approved and not doc.rejected}" class="text-amber-400 text-xs bg-amber-950/60 px-2.5 py-1 rounded border border-amber-800"> Chưa Duyệt</span>
+
+                                        <button type="button"
+                                                th:data-order-id="${item.id}"
+                                                th:data-order-status="${item.trangThai}"
+                                                th:data-ten-hang="${item.tenHang}"
+                                                th:data-loai-hang="${item.loaiHang}"
+                                                th:data-min-temp="${item.minTemp}"
+                                                th:data-max-temp="${item.maxTemp}"
+                                                th:data-diem-di="${item.diemDi}"
+                                                th:data-diem-den="${item.diemDen}"
+                                                th:data-nguoi-tao="${item.nguoiTao}"
+                                                th:data-doc-id="${doc.id}"
+                                                th:data-loai-giay-to="${doc.loaiGiayTo}"
+                                                th:data-ten-file="${doc.tenFile}"
+                                                th:data-approved="${doc.approved}"
+                                                th:data-rejected="${doc.rejected}"
+                                                th:data-can-approve="${currentUser.vaiTro == 'KIEM_DUYET_CHUNG_TU' or currentUser.vaiTro == 'QUAN_TRI_HE_THONG'}"
+                                                onclick="openDocModal(this)"
+                                                class="bg-sky-700 hover:bg-sky-600 text-white text-xs px-2.5 py-1 rounded flex items-center gap-1 transition font-medium">
+                                             Xem Giấy Tờ Đã Khai
+                                        </button>
+
+                                        <form th:if="${not doc.approved and not doc.rejected and item.trangThai != 'Từ chối' and item.trangThai != 'DA_HUY' and (currentUser.vaiTro == 'KIEM_DUYET_CHUNG_TU' or currentUser.vaiTro == 'QUAN_TRI_HE_THONG')}" action="/orders/approve-doc" method="post" class="inline">
+                                            <input type="hidden" name="orderId" th:value="${item.id}">
+                                            <input type="hidden" name="docId" th:value="${doc.id}">
+                                            <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-2.5 py-1 rounded font-bold transition"> Phê Duyệt File</button>
+                                        </form>
+
+                                        <form th:if="${doc.rejected and (currentUser.vaiTro == 'NGUOI_GUI_HANG' or currentUser.vaiTro == 'QUAN_TRI_HE_THONG')}" action="/orders/delete-doc" method="post" class="inline">
+                                            <input type="hidden" name="orderId" th:value="${item.id}">
+                                            <input type="hidden" name="docId" th:value="${doc.id}">
+                                            <button type="submit" class="bg-rose-700 hover:bg-rose-600 text-white text-xs px-2.5 py-1 rounded font-bold transition"> Xóa Giấy Tờ Này</button>
+                                        </form>
+                                    </div>
+                                </div>
+
+                                <div th:if="${doc.rejected and (currentUser.vaiTro == 'NGUOI_GUI_HANG' or currentUser.vaiTro == 'QUAN_TRI_HE_THONG')}" class="pt-2.5 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2">
+                                    <span class="text-[11px] text-amber-300 font-semibold"> Bổ sung / sửa tệp dựa trên chứng từ bị từ chối này:</span>
+                                    <form action="/orders/resubmit" method="post" enctype="multipart/form-data" class="flex flex-wrap items-center gap-2">
+                                        <input type="hidden" name="orderId" th:value="${item.id}">
+                                        <input type="hidden" name="docId" th:value="${doc.id}">
+                                        <input type="file" name="fileUpload" required class="bg-slate-950 border border-slate-700 rounded text-xs p-1 text-slate-300 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-amber-600 file:text-white">
+                                        <button type="submit" class="bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold px-3 py-1.5 rounded transition">Bổ Sung / Sửa File Này</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- THAO TÁC THEO VAI TRÒ -->
+                    <div class="pt-3 border-t border-slate-800 flex flex-wrap gap-3">
+
+                        <!-- 1. CHỦ HÀNG GỬI LẠI GIẤY TỜ MỚI SAU KHI ĐÃ XÓA -->
+                        <div th:if="${item.trangThai == 'Từ chối' and #lists.isEmpty(item.danhSachGiayTo) and (currentUser.vaiTro == 'NGUOI_GUI_HANG' or currentUser.vaiTro == 'QUAN_TRI_HE_THONG')}">
+                            <form action="/orders/resubmit" method="post" enctype="multipart/form-data" class="flex flex-wrap items-center gap-2">
+                                <input type="hidden" name="orderId" th:value="${item.id}">
+                                <select name="loaiGiayTo" class="bg-slate-900 border border-slate-700 rounded text-xs p-1.5 text-white">
+                                    <option value="Giấy Phép Vận Chuyển Hàng Đặc Biệt Y Tế">Giấy Phép Vận Chuyển Hàng Đặc Biệt Y Tế</option>
+                                    <option value="Giấy Chứng Nhận HACCP / CO-CQ">Giấy Chứng Nhận HACCP / CO-CQ</option>
+                                    <option value="Phiếu Kiểm Định Chất Lượng Seafood">Phiếu Kiểm Định Chất Lượng Seafood</option>
+                                    <option value="Giấy Phép Vệ Sinh An Toàn Thực Phẩm">Giấy Phép Vệ Sinh An Toàn Thực Phẩm</option>
+                                </select>
+                                <input type="file" name="fileUpload" required class="bg-slate-900 border border-slate-700 rounded text-xs p-1 text-slate-300 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-sky-600 file:text-white">
+                                <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded"> Gửi Lại Giấy Tờ Mới</button>
+                            </form>
+                        </div>
+
+                        <!-- 2. KIỂM DUYỆT VIÊN -->
+                        <div th:if="${item.trangThai == 'Chờ kiểm duyệt' and (currentUser.vaiTro == 'KIEM_DUYET_CHUNG_TU' or currentUser.vaiTro == 'QUAN_TRI_HE_THONG')}">
+                            <form action="/orders/reject" method="post" class="flex gap-2">
+                                <input type="hidden" name="orderId" th:value="${item.id}">
+                                <input type="text" name="reason" placeholder="Nhập lý do từ chối..." required class="bg-slate-900 border border-slate-700 rounded text-xs p-1.5 text-white">
+                                <button type="submit" class="bg-rose-700 hover:bg-rose-600 text-white text-xs font-bold px-3 py-1.5 rounded">Từ Chối Đơn</button>
+                            </form>
+                        </div>
+
+                        <!-- 3. ĐIỀU PHỐI VIÊN -->
+                        <div th:if="${(item.trangThai == 'Đã phê duyệt' or item.trangThai == 'Đã phân công') and (currentUser.vaiTro == 'DIEU_PHOI_VIEN' or currentUser.vaiTro == 'QUAN_TRI_HE_THONG')}" class="flex flex-wrap gap-2">
+                            <form action="/orders/assign-driver" method="post" class="flex gap-2">
+                                <input type="hidden" name="orderId" th:value="${item.id}">
+                                <select name="driverEmail" required class="bg-slate-900 border border-slate-700 rounded text-xs p-1.5 text-white">
+                                    <option th:each="u : ${users}" th:if="${u.vaiTro == 'TAI_XE_VAN_CHUYEN'}" th:value="${u.email}" th:text="|${u.hoTen} (${u.email})|"></option>
+                                </select>
+                                <input type="text" name="bienSoXe" value="51D-888.99" required class="bg-slate-900 border border-slate-700 rounded text-xs p-1.5 text-white w-28">
+                                <button type="submit" class="bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold px-3 py-1.5 rounded">Gán Xe Vận Chuyển</button>
+                            </form>
+                            <form th:if="${item.trangThai == 'Đã phân công'}" action="/orders/start-trip" method="post" class="inline">
+                                <input type="hidden" name="orderId" th:value="${item.id}">
+                                <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-3 py-1.5 rounded">Bắt Đầu Chuyến Đi</button>
+                            </form>
+                        </div>
+
+                        <!-- 4. TÀI XẾ VẬN CHUYỂN (NHIỆT ĐỘ CHỈ CẬP NHẬT QUA FLUTTER, BẮT BUỘC ĐỦ 3 TRẠM MỚI ĐƯỢC BÀN GIAO) -->
+                        <div th:if="${item.maTaiXe != null and (item.trangThai == 'Đã phân công' or item.trangThai == 'Đang vận chuyển' or item.trangThai == 'BI_CHAN' or item.trangThai == 'Đã giao hàng') and (currentUser.vaiTro == 'TAI_XE_VAN_CHUYEN' or currentUser.vaiTro == 'QUAN_TRI_HE_THONG')}" class="w-full space-y-3 pt-2">
+                            <div th:if="${item.trangThai == 'Đã phân công'}" class="flex items-center gap-2">
+                                <form action="/orders/start-trip" method="post" class="inline">
+                                    <input type="hidden" name="orderId" th:value="${item.id}">
+                                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-3 py-1.5 rounded"> Xác Nhận Bắt Đầu Chuyến Đi</button>
+                                </form>
+                            </div>
+
+                            <!-- THÔNG BÁO: KIỂM TRA NHIỆT ĐỘ THỰC HIỆN TRÊN FLUTTER -->
+                            <div th:if="${item.trangThai != 'Đã giao hàng'}" class="bg-sky-950/60 border border-sky-800/80 p-3 rounded-lg text-xs text-sky-200 flex flex-wrap items-center justify-between gap-2">
+                                <div>
+                                     <b>Kiểm tra nhiệt độ cảm biến:</b> Tài xế thực hiện ấn kiểm tra &amp; gửi nhiệt độ trực tiếp trên ứng dụng <b>Flutter Mobile</b> trước khi xác nhận qua từng trạm.
+                                </div>
+                                <span class="font-mono text-emerald-400 font-bold" th:text="|Nhiệt độ hiện tại: ${item.nhietDoThucTe}°C|"></span>
+                            </div>
+
+                            <!-- CÁC TRẠM DỌC ĐƯỜNG (BẮT BUỘC QUA ĐỦ 3/3 TRẠM) -->
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="text-xs text-slate-400 font-bold" th:text="|Các Trạm Dọc Đường (${item.soTramDaQua}/3 trạm):|"></span>
+                                <div th:each="tram : ${item.tuyenDuong}" class="inline-flex items-center gap-1.5 bg-slate-950 border border-slate-800 px-2.5 py-1.5 rounded text-xs">
+                                    <span th:text="${tram.tenTram}"></span>
+                                    <span th:if="${tram.daQua}" class="text-emerald-400 font-bold" th:text="${tram.nhietDoXacNhan != null} ? |[ Đã Qua - ${tram.nhietDoXacNhan}°C]| : '[✓ Đã Qua]'"></span>
+                                    <span th:if="${not tram.daQua}" class="text-slate-500">[Chưa Qua]</span>
+                                </div>
+                            </div>
+
+                            <!-- CHẶN BÀN GIAO NẾU CHƯA ĐỦ 3 TRẠM -->
+                            <div th:if="${item.trangThai != 'Đã giao hàng' and not item.duBaTram}" class="bg-amber-950/60 border border-amber-700/80 p-3 rounded text-xs text-amber-300">
+                                 <b>Chưa thể bàn giao POD:</b> Tài xế mới đi qua <span class="font-bold text-white" th:text="${item.soTramDaQua}"></span> trạm kiểm tra. Vui lòng kiểm tra nhiệt độ và xác nhận qua đủ 3 trạm trên ứng dụng Flutter để mở khóa bàn giao.
+                            </div>
+
+                            <!-- FORM BÀN GIAO CHỈ MỞ KHI ĐÃ QUA ĐỦ 3/3 TRẠM -->
+                            <div th:if="${item.trangThai != 'Đã giao hàng' and item.duBaTram}" class="flex flex-wrap gap-2 items-center">
+                                <form action="/orders/complete-delivery" method="post" enctype="multipart/form-data" class="flex flex-wrap gap-2 items-center">
+                                    <input type="hidden" name="orderId" th:value="${item.id}">
+                                    <input type="file" name="podFile" class="bg-slate-900 border border-slate-700 rounded text-xs p-1 text-slate-300 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-emerald-700 file:text-white">
+                                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-1.5 rounded"> Thực Hiện Bàn Giao POD (Đã đủ 3/3 trạm)</button>
+                                </form>
+                                <a th:href="@{/orders/complete-delivery(orderId=${item.id})}" class="bg-sky-700 hover:bg-sky-600 text-white text-xs font-bold px-3 py-1.5 rounded">Mở Trang Bàn Giao Chi Tiết </a>
+                            </div>
+
+                            <div th:if="${item.trangThai == 'Đã giao hàng'}" class="flex items-center gap-3">
+                                <span class="text-emerald-400 text-xs font-bold">Đơn hàng này đã qua đủ 3/3 trạm và bàn giao POD thành công.</span>
+                                <a th:href="@{/orders/complete-delivery(success=true, orderId=${item.id})}" class="bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold px-3 py-1.5 rounded">Xem Biên Bản Bàn Giao Thành Công </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL XEM CHI TIẾT GIẤY TỜ THỰC TẾ -->
+    <div id="docModal" class="fixed inset-0 bg-black/75 hidden backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-2xl w-full p-6 shadow-2xl relative">
+            <button onclick="closeDocModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white text-lg font-bold">✕</button>
+
+            <div class="flex items-center gap-2 mb-4 pb-3 border-b border-slate-700">
+                <span class="text-2xl">📋</span>
+                <div>
+                    <h3 class="text-lg font-bold text-sky-400">CHI TIẾT CHỨNG TỪ & HỒ SƠ VẬN CHUYỂN LẠNH</h3>
+                    <p class="text-xs text-slate-400">Thông tin tệp đính kèm và dữ liệu hồ sơ thực tế do chủ hàng khai báo lúc tạo đơn</p>
+                </div>
+            </div>
+            <div class="space-y-4 text-xs">
+                <div class="bg-slate-900 p-3.5 rounded-lg border border-slate-700 space-y-2">
+                    <div class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Thông Tin Đơn Hàng Liên Quan</div>
+                    <div class="grid grid-cols-2 gap-2 text-slate-300">
+                        <div>• Mã Đơn Hàng: <span id="modalOrderId" class="font-bold text-sky-400 font-mono"></span></div>
+                        <div>• Tên Hàng Hóa: <span id="modalTenHang" class="font-bold text-white"></span></div>
+                        <div>• Loại Hàng Hóa: <span id="modalLoaiHang" class="text-amber-300"></span></div>
+                        <div>• Chủ Hàng / Người Tạo: <span id="modalNguoiTao" class="text-sky-300"></span></div>
+                        <div>• Nhiệt Độ Quy Định: <span id="modalTempRange" class="font-bold text-emerald-400"></span></div>
+                        <div>• Lộ Trình: <span id="modalRoute" class="text-slate-200"></span></div>
+                    </div>
+                </div>
+                <div class="bg-slate-900 p-3.5 rounded-lg border border-slate-700 space-y-3">
+                    <div class="text-xs font-bold text-slate-300 uppercase tracking-wider">📄 Dữ Liệu Tệp Giấy Tờ Đã Đăng Tải</div>
+
+                    <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 text-slate-300 space-y-3 font-mono text-[11px]">
+                        <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                            <span class="text-sky-400 font-bold flex items-center gap-1.5">
+                                📂 THÔNG TIN FILE CHỨNG TỪ THỰC TẾ
+                            </span>
+                            <span id="previewFileExt" class="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-sky-300 font-mono">PDF / DOCX</span>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] leading-relaxed">
+                            <div>• <span class="text-slate-400">Tên File Đính Kèm:</span> <span id="previewTenFile" class="text-sky-300 font-bold underline"></span></div>
+                            <div>• <span class="text-slate-400">Loại Chứng Từ:</span> <span id="previewLoaiGiayTo" class="text-white font-bold"></span></div>
+                            <div>• <span class="text-slate-400">Mã Chứng Từ ID:</span> <span id="previewDocId" class="text-amber-400 font-bold"></span></div>
+                            <div>• <span class="text-slate-400">Trạng Thái:</span> <span id="modalTrangThai" class="font-bold"></span></div>
+                        </div>
+                        <div class="p-3 bg-slate-900/90 rounded border border-slate-800 space-y-1 text-[11px]">
+                            <div class="text-slate-400 font-bold">📋 Nội dung cam kết hồ sơ đính kèm:</div>
+                            <div class="text-slate-300">Chứng từ này áp dụng cho mặt hàng <span id="previewTenHang" class="text-white font-bold"></span> thuộc đơn hàng <span id="previewOrderId" class="text-sky-400 font-bold"></span>. Sản phẩm bắt buộc bảo quản trong khoảng nhiệt độ <span id="previewTemp" class="text-emerald-400 font-bold"></span> trong toàn bộ chuỗi vận chuyển.</div>
+                        </div>
+                        <div class="pt-1 flex justify-between items-center text-[10px]">
+                            <span class="text-slate-500">✓ Mã định danh hồ sơ số: SECURE_HASH_OK</span>
+                            <a id="previewDownloadBtn" href="/files/download" target="_blank" class="bg-sky-600 hover:bg-sky-500 text-white font-sans px-4 py-1.5 rounded text-xs font-bold transition inline-flex items-center gap-1 shadow">
+                                📥 Tải / Mở Xem Tệp Này (.PDF)
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-3 pt-2">
+                    <button type="button" onclick="closeDocModal()" class="bg-slate-700 hover:bg-slate-600 text-white font-bold px-4 py-2 rounded text-xs">Đóng Hộp Thoại</button>
+
+                    <div id="modalApproveFormContainer">
+                        <form id="modalApproveForm" action="/orders/approve-doc" method="post" class="inline">
+                            <input type="hidden" name="orderId" id="modalFormOrderId">
+                            <input type="hidden" name="docId" id="modalFormDocId">
+                            <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-5 py-2 rounded text-xs transition">✓ Phê Duyệt Ngay Chứng Từ Này</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function openDocModal(btn) {
+            var orderId = btn.getAttribute('data-order-id') || '';
+            var orderStatus = btn.getAttribute('data-order-status') || '';
+            var tenHang = btn.getAttribute('data-ten-hang') || '';
+            var loaiHang = btn.getAttribute('data-loai-hang') || '';
+            var minTemp = btn.getAttribute('data-min-temp') || '';
+            var maxTemp = btn.getAttribute('data-max-temp') || '';
+            var diemDi = btn.getAttribute('data-diem-di') || '';
+            var diemDen = btn.getAttribute('data-diem-den') || '';
+            var nguoiTao = btn.getAttribute('data-nguoi-tao') || '';
+            var docId = btn.getAttribute('data-doc-id') || '';
+            var loaiGiayTo = btn.getAttribute('data-loai-giay-to') || '';
+            var tenFile = btn.getAttribute('data-ten-file') || '';
+            var approved = btn.getAttribute('data-approved') === 'true';
+            var rejected = btn.getAttribute('data-rejected') === 'true';
+            var canApprove = btn.getAttribute('data-can-approve') === 'true';
+
+            document.getElementById('modalOrderId').innerText = orderId;
+            document.getElementById('modalTenHang').innerText = tenHang;
+            document.getElementById('modalLoaiHang').innerText = loaiHang;
+            document.getElementById('modalNguoiTao').innerText = nguoiTao;
+            document.getElementById('modalTempRange').innerText = minTemp + '°C đến ' + maxTemp + '°C';
+            document.getElementById('modalRoute').innerText = diemDi + ' ➔ ' + diemDen;
+            document.getElementById('previewTenFile').innerText = tenFile;
+            document.getElementById('previewLoaiGiayTo').innerText = loaiGiayTo;
+            document.getElementById('previewDocId').innerText = docId;
+
+            document.getElementById('previewTenHang').innerText = tenHang;
+            document.getElementById('previewOrderId').innerText = orderId;
+            document.getElementById('previewTemp').innerText = minTemp + '°C đến ' + maxTemp + '°C';
+
+            var downloadLink = '/files/download?fileName=' + encodeURIComponent(tenFile) + '&tenHang=' + encodeURIComponent(tenHang) + '&loaiGiayTo=' + encodeURIComponent(loaiGiayTo);
+            var btnElem = document.getElementById('previewDownloadBtn');
+            btnElem.setAttribute('href', downloadLink);
+            btnElem.setAttribute('download', tenFile);
+
+            var ext = tenFile.split('.').pop().toUpperCase();
+            document.getElementById('previewFileExt').innerText = ext.length < 5 ? ext + ' FILE' : 'DOCUMENT FILE';
+
+            var statusElem = document.getElementById('modalTrangThai');
+            var approveBtnContainer = document.getElementById('modalApproveFormContainer');
+
+            if (approved) {
+                statusElem.innerHTML = '<span class="text-emerald-400">✓ Đã Phê Duyệt</span>';
+                approveBtnContainer.style.display = 'none';
+            } else if (rejected || orderStatus === 'Từ chối' || orderStatus === 'DA_HUY') {
+                statusElem.innerHTML = '<span class="text-rose-400">❌ Đã Từ Chối (Chờ Chủ Hàng Sửa / Xóa)</span>';
+                approveBtnContainer.style.display = 'none';
+            } else {
+                statusElem.innerHTML = '<span class="text-amber-400">⏳ Chưa Phê Duyệt</span>';
+                approveBtnContainer.style.display = canApprove ? 'block' : 'none';
+                document.getElementById('modalFormOrderId').value = orderId;
+                document.getElementById('modalFormDocId').value = docId;
+            }
+            document.getElementById('docModal').classList.remove('hidden');
+        }
+
+        function closeDocModal() {
+            document.getElementById('docModal').classList.add('hidden');
+        }
+
+        var previousOrdersMap = {};
+        function checkLiveUpdates() {
+            fetch('/api/orders')
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    if (!data || !Array.isArray(data)) return;
+
+                    data.forEach(function(order) {
+                        var old = previousOrdersMap[order.id];
+                        if (old) {
+                            if (old.nhietDoThucTe !== order.nhietDoThucTe) {
+                                showLiveAlert(
+                                    '🌡️ Cập nhật nhiệt độ mới từ Tài xế (' + (order.taiXeTen || 'Tài xế') + ')',
+                                    'Đơn hàng ' + order.id + ' (' + order.tenHang + ') vừa cập nhật nhiệt độ thực tế: ' + order.nhietDoThucTe + '°C.'
+                                );
+                            } else if (old.soTramDaQua !== order.soTramDaQua) {
+                                showLiveAlert(
+                                    '🛣️ Tài xế vừa xác nhận qua trạm kiểm tra',
+                                    'Đơn hàng ' + order.id + ' đã đi qua ' + order.soTramDaQua + '/3 trạm.'
+                                );
+                            } else if (old.trangThai !== order.trangThai) {
+                                showLiveAlert(
+                                    'Cập nhật trạng thái đơn hàng',
+                                    'Đơn hàng ' + order.id + ' vừa chuyển sang trạng thái: ' + order.trangThai
+                                );
+                            }
+                        }
+                        previousOrdersMap[order.id] = {
+                            nhietDoThucTe: order.nhietDoThucTe,
+                            soTramDaQua: order.soTramDaQua,
+                            trangThai: order.trangThai
+                        };
+                    });
+                })
+                .catch(function(err) { console.log('Polling sync error:', err); });
+        }
+
+        function showLiveAlert(title, message) {
+            document.getElementById('alertTitle').innerText = title;
+            document.getElementById('alertMessage').innerText = message;
+            var container = document.getElementById('liveAlertContainer');
+            container.classList.remove('hidden');
+
+            setTimeout(function() {
+                window.location.reload();
+            }, 2500);
+        }
+
+        setInterval(checkLiveUpdates, 3000);
+        checkLiveUpdates();
+    </script>
+</body>
+</html>
