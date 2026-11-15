@@ -1,4 +1,4 @@
-# LOG-05 - Quản lý vận tải chuỗi lạnh
+# LOG-05 - Quản lý vận chuyển hàng đặc biệt 
 
 Ứng dụng mô phỏng quy trình quản lý vận chuyển hàng cần kiểm soát nhiệt độ. Hệ thống có các vai trò người gửi hàng, điều phối viên, kiểm duyệt viên, tài xế và quản trị viên; hỗ trợ quản lý đơn, chứng từ, phân công, theo dõi nhiệt độ, bàn giao và báo cáo.
 
